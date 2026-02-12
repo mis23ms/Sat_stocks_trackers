@@ -24,11 +24,7 @@
 <body>
   <h1>Sat_stocks_trackers</h1>
 
-  <div class="row">
-    <a class="btn" href="https://github.com/mis23ms/TW_Stock_News_Tracker" target="_blank" rel="noopener">TW Stock News Tracker</a>
-    <a class="btn" href="https://github.com/mis23ms/US_ETF_Stocks" target="_blank" rel="noopener">SEC Filing Tracker</a>
-    <a class="btn" href="https://github.com/mis23ms/tw-keyword-research" target="_blank" rel="noopener">tw-keyword-research</a>
-  </div>
+  <div class="row" id="topBtns"></div>
 
   <div class="grid">
     <div class="card">
@@ -61,37 +57,51 @@
   </div>
 
 <script>
-  const OWNER = "mis23ms";
-
   const SOURCES = [
     {
       name: "台股新聞追蹤",
       repo: "TW_Stock_News_Tracker",
-      page: "https://github.com/mis23ms/TW_Stock_News_Tracker",
+      pagesBase: "https://mis23ms.github.io/TW_Stock_News_Tracker/",
       indexRaw: "https://raw.githubusercontent.com/mis23ms/TW_Stock_News_Tracker/main/index.md",
       repoApi: "https://api.github.com/repos/mis23ms/TW_Stock_News_Tracker",
     },
     {
       name: "SEC Filing Tracker",
       repo: "US_ETF_Stocks",
-      page: "https://github.com/mis23ms/US_ETF_Stocks",
+      pagesBase: "https://mis23ms.github.io/US_ETF_Stocks/",
       indexRaw: "https://raw.githubusercontent.com/mis23ms/US_ETF_Stocks/main/index.md",
       repoApi: "https://api.github.com/repos/mis23ms/US_ETF_Stocks",
     },
     {
       name: "關鍵字研究",
       repo: "tw-keyword-research",
-      page: "https://github.com/mis23ms/tw-keyword-research",
+      pagesBase: "https://mis23ms.github.io/tw-keyword-research/",
       indexRaw: "https://raw.githubusercontent.com/mis23ms/tw-keyword-research/main/index.md",
       repoApi: "https://api.github.com/repos/mis23ms/tw-keyword-research",
     },
   ];
 
+  const $topBtns = document.getElementById("topBtns");
   const $status = document.getElementById("status");
   const $list = document.getElementById("highlights");
   const $updatedAt = document.getElementById("updatedAt");
   const $count = document.getElementById("count");
   const $perSource = document.getElementById("perSource");
+
+  function renderTopButtons() {
+    $topBtns.innerHTML = "";
+    SOURCES.forEach(s => {
+      const a = document.createElement("a");
+      a.className = "btn";
+      a.href = s.pagesBase;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = s.repo;
+      $topBtns.appendChild(a);
+    });
+  }
+
+  renderTopButtons();
 
   document.getElementById("u1").textContent = SOURCES[0].indexRaw;
   document.getElementById("u2").textContent = SOURCES[1].indexRaw;
@@ -135,6 +145,34 @@
     return d.toISOString().replace(".000Z", "Z");
   }
 
+  function isAbsUrl(u) {
+    return /^https?:\/\//i.test(u);
+  }
+
+  function normalizePagesBase(base) {
+    const b = String(base || "");
+    if (!b) return "";
+    return b.endsWith("/") ? b : (b + "/");
+  }
+
+  function joinPagesUrl(pagesBase, url) {
+    const base = normalizePagesBase(pagesBase);
+    const u = String(url || "").trim();
+    if (!u) return base || "#";
+    if (isAbsUrl(u)) return u;
+
+    if (u.startsWith("/")) {
+      try {
+        const b = new URL(base);
+        return b.origin + u;
+      } catch (e) {
+        return base + u.replace(/^\//, "");
+      }
+    }
+
+    return base + u;
+  }
+
   function parseIndexHighlights(md, maxItems) {
     const text = String(md || "");
     const lines = text.split(/\r?\n/);
@@ -149,6 +187,8 @@
 
       const trimmed = line.trim();
       if (!trimmed) continue;
+
+      linkRe.lastIndex = 0;
 
       let m;
       while ((m = linkRe.exec(trimmed)) !== null) {
@@ -168,7 +208,7 @@
 
     if (items.length) return items;
 
-    return [{ display: "index.md 無可解析連結", url: "#" }];
+    return [{ display: "index.md 無可解析連結", url: "" }];
   }
 
   async function fetchText(url) {
@@ -218,7 +258,8 @@
         if (pushedAt && (!latestTs || pushedAt > latestTs)) latestTs = pushedAt;
 
         for (const it of highlights) {
-          addItem(it.display, source.name, it.url || source.page);
+          const href = joinPagesUrl(source.pagesBase, it.url);
+          addItem(it.display, source.name, href);
           total++;
         }
       } else {
