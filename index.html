@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sat_stocks_trackers</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; margin: 24px; color:#111; }
+    h1 { margin: 0 0 12px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; margin: 10px 0 18px; }
+    .btn { display:inline-block; padding:10px 12px; border:1px solid #ddd; border-radius:12px; text-decoration:none; color:#111; }
+    .card { border:1px solid #eee; border-radius:16px; padding:14px 16px; margin-top:14px; }
+    .muted { color:#666; font-size:14px; }
+    ul { margin: 10px 0 0 18px; }
+    li { margin: 6px 0; }
+    .tag { font-size:12px; padding:2px 8px; border:1px solid #ddd; border-radius:999px; margin-left:8px; color:#444; }
+    .pill { font-size:12px; padding:2px 8px; border:1px solid #ddd; border-radius:999px; color:#444; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 10px; }
+    @media (min-width: 860px) { .grid { grid-template-columns: 1fr 1fr; } }
+    code { background:#f7f7f7; padding: 2px 6px; border-radius: 8px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body>
+  <h1>Sat_stocks_trackers</h1>
+
+  <div class="row">
+    <a class="btn" href="https://github.com/mis23ms/TW_Stock_News_Tracker" target="_blank" rel="noopener">TW Stock News Tracker</a>
+    <a class="btn" href="https://github.com/mis23ms/US_ETF_Stocks" target="_blank" rel="noopener">SEC Filing Tracker</a>
+    <a class="btn" href="https://github.com/mis23ms/tw-keyword-research" target="_blank" rel="noopener">tw-keyword-research</a>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="row" style="align-items:center; margin:0;">
+        <h2 style="margin:0;">今日重點</h2>
+        <span id="count" class="pill">0</span>
+      </div>
+      <div id="status" class="muted" style="margin-top:6px;">載入中…</div>
+      <ul id="highlights"></ul>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 8px;">最新更新</h2>
+      <div id="updatedAt" class="muted">—</div>
+
+      <div class="muted" style="margin-top:10px;">
+        各來源更新時間：
+        <div id="perSource" class="mono" style="margin-top:6px; line-height:1.7;"></div>
+      </div>
+
+      <div class="muted" style="margin-top:10px;">
+        資料來源：
+        <div style="margin-top:6px; line-height:1.7;">
+          <div>• <code id="u1"></code></div>
+          <div>• <code id="u2"></code></div>
+          <div>• <code id="u3"></code></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const OWNER = "mis23ms";
+
+  const SOURCES = [
+    {
+      name: "台股新聞追蹤",
+      repo: "TW_Stock_News_Tracker",
+      page: "https://github.com/mis23ms/TW_Stock_News_Tracker",
+      indexRaw: "https://raw.githubusercontent.com/mis23ms/TW_Stock_News_Tracker/main/index.md",
+      repoApi: "https://api.github.com/repos/mis23ms/TW_Stock_News_Tracker",
+    },
+    {
+      name: "SEC Filing Tracker",
+      repo: "US_ETF_Stocks",
+      page: "https://github.com/mis23ms/US_ETF_Stocks",
+      indexRaw: "https://raw.githubusercontent.com/mis23ms/US_ETF_Stocks/main/index.md",
+      repoApi: "https://api.github.com/repos/mis23ms/US_ETF_Stocks",
+    },
+    {
+      name: "關鍵字研究",
+      repo: "tw-keyword-research",
+      page: "https://github.com/mis23ms/tw-keyword-research",
+      indexRaw: "https://raw.githubusercontent.com/mis23ms/tw-keyword-research/main/index.md",
+      repoApi: "https://api.github.com/repos/mis23ms/tw-keyword-research",
+    },
+  ];
+
+  const $status = document.getElementById("status");
+  const $list = document.getElementById("highlights");
+  const $updatedAt = document.getElementById("updatedAt");
+  const $count = document.getElementById("count");
+  const $perSource = document.getElementById("perSource");
+
+  document.getElementById("u1").textContent = SOURCES[0].indexRaw;
+  document.getElementById("u2").textContent = SOURCES[1].indexRaw;
+  document.getElementById("u3").textContent = SOURCES[2].indexRaw;
+
+  function addItem(text, sourceName, link) {
+    const li = document.createElement("li");
+
+    const a = document.createElement("a");
+    a.href = link;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = text;
+    a.style.color = "#111";
+    a.style.textDecoration = "none";
+    a.addEventListener("mouseover", () => a.style.textDecoration = "underline");
+    a.addEventListener("mouseout", () => a.style.textDecoration = "none");
+
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = sourceName;
+
+    li.appendChild(a);
+    li.appendChild(tag);
+    $list.appendChild(li);
+  }
+
+  function setPerSourceLine(lines) {
+    $perSource.innerHTML = "";
+    lines.forEach(t => {
+      const div = document.createElement("div");
+      div.textContent = t;
+      $perSource.appendChild(div);
+    });
+  }
+
+  function toIsoLike(s) {
+    if (!s) return "";
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return String(s);
+    return d.toISOString().replace(".000Z", "Z");
+  }
+
+  function parseIndexHighlights(md, maxItems) {
+    const text = String(md || "");
+    const lines = text.split(/\r?\n/);
+
+    const items = [];
+    const seen = new Set();
+
+    const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
+
+    for (const line of lines) {
+      if (items.length >= maxItems) break;
+
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      let m;
+      while ((m = linkRe.exec(trimmed)) !== null) {
+        const title = (m[1] || "").trim();
+        const url = (m[2] || "").trim();
+        if (!url) continue;
+
+        const key = title + "|" + url;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const display = title || url;
+        items.push({ display, url });
+        if (items.length >= maxItems) break;
+      }
+    }
+
+    if (items.length) return items;
+
+    return [{ display: "index.md 無可解析連結", url: "#" }];
+  }
+
+  async function fetchText(url) {
+    const u = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
+    const r = await fetch(u, { cache: "no-store" });
+    if (!r.ok) throw new Error(`抓取失敗：${r.status} ${r.statusText}`);
+    return await r.text();
+  }
+
+  async function fetchJson(url) {
+    const u = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
+    const r = await fetch(u, { cache: "no-store" });
+    if (!r.ok) throw new Error(`抓取失敗：${r.status} ${r.statusText}`);
+    return await r.json();
+  }
+
+  async function loadAll() {
+    $status.textContent = "載入中…";
+    $list.innerHTML = "";
+    $count.textContent = "0";
+    $updatedAt.textContent = "—";
+    setPerSourceLine([]);
+
+    let total = 0;
+    let latestTs = "";
+    const perSourceLines = [];
+
+    const results = await Promise.allSettled(
+      SOURCES.map(async s => {
+        const [repoInfo, indexMd] = await Promise.all([
+          fetchJson(s.repoApi),
+          fetchText(s.indexRaw),
+        ]);
+
+        const pushedAt = toIsoLike(repoInfo && repoInfo.pushed_at ? repoInfo.pushed_at : "");
+        const highlights = parseIndexHighlights(indexMd, 12);
+
+        return { source: s, pushedAt, highlights };
+      })
+    );
+
+    for (const r of results) {
+      if (r.status === "fulfilled") {
+        const { source, pushedAt, highlights } = r.value;
+
+        perSourceLines.push(`${source.name}: ${pushedAt || "NA"}`);
+        if (pushedAt && (!latestTs || pushedAt > latestTs)) latestTs = pushedAt;
+
+        for (const it of highlights) {
+          addItem(it.display, source.name, it.url || source.page);
+          total++;
+        }
+      } else {
+        const msg = r.reason?.message || "抓取失敗";
+        perSourceLines.push(`(錯誤) ${msg}`);
+        addItem(msg, "總覽", "#");
+        total++;
+      }
+    }
+
+    setPerSourceLine(perSourceLines);
+    $updatedAt.textContent = latestTs || "—";
+    $count.textContent = String(total);
+    $status.textContent = total ? `共 ${total} 則` : "目前沒有重點";
+  }
+
+  loadAll();
+</script>
+</body>
+</html>
